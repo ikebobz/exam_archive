@@ -214,7 +214,7 @@ export default function QuestionFormPage() {
   };
 
   const removeImage = () => {
-    form.setValue("imageUrl", "");
+    form.setValue("imageUrl", "", { shouldDirty: true });
     setImagePreview(null);
   };
 
@@ -354,12 +354,11 @@ export default function QuestionFormPage() {
                         )}
                         <Input
                           placeholder="Or enter image URL..."
-                          {...field}
+                          value={field.value || ""}
                           onChange={(e) => {
-                            field.onChange(e);
-                            if (e.target.value) {
-                              setImagePreview(e.target.value);
-                            }
+                            const value = e.target.value;
+                            field.onChange(value);
+                            setImagePreview(value || null);
                           }}
                           data-testid="input-image-url"
                         />

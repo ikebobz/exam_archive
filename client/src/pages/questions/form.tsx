@@ -26,8 +26,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Loader2, Plus, Trash2, GripVertical } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, Upload, ImageIcon, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useUpload } from "@/hooks/use-upload";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Question, Subject, Exam, Answer } from "@shared/schema";
 import { Link } from "wouter";
@@ -41,6 +42,7 @@ const answerSchema = z.object({
 const questionFormSchema = z.object({
   subjectId: z.string().min(1, "Please select a subject"),
   questionText: z.string().min(1, "Question text is required"),
+  imageUrl: z.string().optional(),
   year: z.string().optional(),
   difficulty: z.string().optional(),
   topic: z.string().optional(),
@@ -56,6 +58,25 @@ export default function QuestionFormPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const isEditing = !!id;
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const { uploadFile, isUploading } = useUpload({
+    onSuccess: (response) => {
+      form.setValue("imageUrl", response.objectPath);
+      setImagePreview(response.objectPath);
+      toast({
+        title: "Image uploaded",
+        description: "The image has been uploaded successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data: question, isLoading: isLoadingQuestion } = useQuery<QuestionWithAnswers>({
     queryKey: ["/api/questions", id],
@@ -71,6 +92,7 @@ export default function QuestionFormPage() {
     defaultValues: {
       subjectId: "",
       questionText: "",
+      imageUrl: "",
       year: "",
       difficulty: "",
       topic: "",
@@ -88,6 +110,7 @@ export default function QuestionFormPage() {
       form.reset({
         subjectId: question.subjectId.toString(),
         questionText: question.questionText,
+        imageUrl: question.imageUrl || "",
         year: question.year?.toString() || "",
         difficulty: question.difficulty || "",
         topic: question.topic || "",
@@ -99,6 +122,9 @@ export default function QuestionFormPage() {
             }))
           : [{ answerText: "", isCorrect: false, explanation: "" }],
       });
+      if (question.imageUrl) {
+        setImagePreview(question.imageUrl);
+      }
     }
   }, [question, form]);
 
@@ -107,6 +133,7 @@ export default function QuestionFormPage() {
       const response = await apiRequest("POST", "/api/questions", {
         subjectId: parseInt(data.subjectId),
         questionText: data.questionText,
+        imageUrl: data.imageUrl || null,
         year: data.year ? parseInt(data.year) : null,
         difficulty: data.difficulty || null,
         topic: data.topic || null,
@@ -137,6 +164,7 @@ export default function QuestionFormPage() {
       const response = await apiRequest("PATCH", `/api/questions/${id}`, {
         subjectId: parseInt(data.subjectId),
         questionText: data.questionText,
+        imageUrl: data.imageUrl || null,
         year: data.year ? parseInt(data.year) : null,
         difficulty: data.difficulty || null,
         topic: data.topic || null,
@@ -168,6 +196,26 @@ export default function QuestionFormPage() {
     } else {
       createMutation.mutate(data);
     }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload an image file.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await uploadFile(file);
+    }
+  };
+
+  const removeImage = () => {
+    form.setValue("imageUrl", "");
+    setImagePreview(null);
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
@@ -244,6 +292,82 @@ export default function QuestionFormPage() {
                         data-testid="input-question-text"
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="imageUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Question Image (Optional)</FormLabel>
+                    <FormControl>
+                      <div className="space-y-3">
+                        {imagePreview ? (
+                          <div className="relative inline-block">
+                            <img
+                              src={imagePreview}
+                              alt="Question image preview"
+                              className="max-w-full max-h-48 rounded-md border border-border object-contain"
+                              data-testid="img-question-preview"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute -top-2 -right-2 h-6 w-6"
+                              onClick={removeImage}
+                              data-testid="button-remove-image"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-4">
+                            <label
+                              className="flex items-center gap-2 px-4 py-2 rounded-md border border-dashed border-border cursor-pointer hover:bg-muted transition-colors"
+                              data-testid="label-upload-image"
+                            >
+                              {isUploading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Upload className="h-4 w-4" />
+                              )}
+                              <span className="text-sm">
+                                {isUploading ? "Uploading..." : "Upload Image"}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageUpload}
+                                disabled={isUploading}
+                                data-testid="input-image-upload"
+                              />
+                            </label>
+                            <span className="text-xs text-muted-foreground">
+                              or paste an image URL below
+                            </span>
+                          </div>
+                        )}
+                        <Input
+                          placeholder="Or enter image URL..."
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            if (e.target.value) {
+                              setImagePreview(e.target.value);
+                            }
+                          }}
+                          data-testid="input-image-url"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormDescription>
+                      Upload an image or provide a URL for visual questions
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -426,7 +550,7 @@ export default function QuestionFormPage() {
           <div className="flex items-center gap-4">
             <Button
               type="submit"
-              disabled={isPending}
+              disabled={isPending || isUploading}
               data-testid="button-submit-question"
             >
               {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

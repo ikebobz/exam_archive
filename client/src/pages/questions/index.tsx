@@ -38,7 +38,8 @@ import {
   Trash2, 
   HelpCircle,
   MoreHorizontal,
-  Eye
+  Eye,
+  ImageIcon
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -186,18 +187,34 @@ export default function QuestionsPage() {
                     <TableRow key={question.id} data-testid={`row-question-${question.id}`}>
                       <TableCell>
                         <div className="flex items-start gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 shrink-0">
-                            <HelpCircle className="h-4 w-4 text-primary" />
-                          </div>
+                          {question.imageUrl ? (
+                            <img 
+                              src={question.imageUrl} 
+                              alt="Question"
+                              className="h-9 w-9 rounded-md object-cover shrink-0"
+                            />
+                          ) : (
+                            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 shrink-0">
+                              <HelpCircle className="h-4 w-4 text-primary" />
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <p className="font-medium text-sm line-clamp-2">
                               {question.questionText}
                             </p>
-                            {question.topic && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Topic: {question.topic}
-                              </p>
-                            )}
+                            <div className="flex items-center gap-2 mt-1">
+                              {question.topic && (
+                                <p className="text-xs text-muted-foreground">
+                                  Topic: {question.topic}
+                                </p>
+                              )}
+                              {question.imageUrl && (
+                                <Badge variant="outline" className="text-xs">
+                                  <ImageIcon className="h-3 w-3 mr-1" />
+                                  Image
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
@@ -303,6 +320,16 @@ export default function QuestionsPage() {
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-2">Question</h4>
                 <p className="text-sm">{viewQuestion.questionText}</p>
+                {viewQuestion.imageUrl && (
+                  <div className="mt-3">
+                    <img 
+                      src={viewQuestion.imageUrl} 
+                      alt="Question image"
+                      className="max-w-full max-h-64 rounded-md border border-border object-contain"
+                      data-testid="img-question-view"
+                    />
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

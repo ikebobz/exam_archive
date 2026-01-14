@@ -195,6 +195,7 @@ export class DatabaseStorage implements IStorage {
     const [created] = await db.insert(questions).values({
       subjectId: question.subjectId,
       questionText: question.questionText,
+      imageUrl: question.imageUrl ?? null,
       year: question.year ?? null,
       difficulty: question.difficulty ?? null,
       topic: question.topic ?? null,
@@ -222,6 +223,7 @@ export class DatabaseStorage implements IStorage {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (question.subjectId !== undefined) updateData.subjectId = question.subjectId;
     if (question.questionText !== undefined) updateData.questionText = question.questionText;
+    if (question.imageUrl !== undefined) updateData.imageUrl = question.imageUrl;
     if (question.year !== undefined) updateData.year = question.year;
     if (question.difficulty !== undefined) updateData.difficulty = question.difficulty;
     if (question.topic !== undefined) updateData.topic = question.topic;
@@ -257,7 +259,7 @@ export class DatabaseStorage implements IStorage {
 
   async bulkCreateQuestions(
     subjectId: number, 
-    questionsData: { question: { questionText: string; year?: number | null; difficulty?: string | null; topic?: string | null }; answers: { answerText: string; isCorrect: boolean; explanation?: string | null }[] }[]
+    questionsData: { question: { questionText: string; imageUrl?: string | null; year?: number | null; difficulty?: string | null; topic?: string | null }; answers: { answerText: string; isCorrect: boolean; explanation?: string | null }[] }[]
   ): Promise<number> {
     let count = 0;
     
@@ -268,6 +270,7 @@ export class DatabaseStorage implements IStorage {
           .values({
             subjectId,
             questionText: data.question.questionText,
+            imageUrl: data.question.imageUrl ?? null,
             year: data.question.year ?? null,
             difficulty: data.question.difficulty ?? null,
             topic: data.question.topic ?? null,

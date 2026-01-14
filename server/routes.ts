@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { insertExamSchema, insertSubjectSchema, insertQuestionSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -12,6 +13,9 @@ export async function registerRoutes(
   // Setup authentication (BEFORE other routes)
   await setupAuth(app);
   registerAuthRoutes(app);
+  
+  // Register object storage routes for image uploads
+  registerObjectStorageRoutes(app);
 
   // Dashboard stats
   app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
@@ -243,6 +247,7 @@ export async function registerRoutes(
     subjectId: z.number(),
     questions: z.array(z.object({
       questionText: z.string().min(1),
+      imageUrl: z.string().optional(),
       year: z.number().optional(),
       difficulty: z.string().optional(),
       topic: z.string().optional(),
@@ -260,6 +265,7 @@ export async function registerRoutes(
       const questionsData = validated.questions.map(q => ({
         question: {
           questionText: q.questionText,
+          imageUrl: q.imageUrl || null,
           year: q.year || null,
           difficulty: q.difficulty || null,
           topic: q.topic || null,

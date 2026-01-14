@@ -44,6 +44,7 @@ export const questions = pgTable("questions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   subjectId: integer("subject_id").notNull().references(() => subjects.id, { onDelete: "cascade" }),
   questionText: text("question_text").notNull(),
+  imageUrl: text("image_url"),
   year: integer("year"),
   difficulty: varchar("difficulty", { length: 20 }),
   topic: varchar("topic", { length: 255 }),
@@ -94,6 +95,7 @@ export const insertSubjectSchema = z.object({
 export const insertQuestionSchema = z.object({
   subjectId: z.number(),
   questionText: z.string().min(1),
+  imageUrl: z.string().nullable().optional(),
   year: z.number().nullable().optional(),
   difficulty: z.string().max(20).nullable().optional(),
   topic: z.string().max(255).nullable().optional(),

@@ -34,6 +34,7 @@ import type { Subject, Exam } from "@shared/schema";
 
 interface ParsedQuestion {
   questionText: string;
+  imageUrl?: string;
   year?: number;
   difficulty?: string;
   topic?: string;
@@ -223,6 +224,7 @@ export default function BulkUploadPage() {
 
       questions.push({
         questionText,
+        imageUrl: getCol("image_url") || getCol("imageurl") || getCol("image") || undefined,
         year: parseInt(getCol("year")) || undefined,
         difficulty: getCol("difficulty") || undefined,
         topic: getCol("topic") || undefined,
@@ -274,9 +276,9 @@ export default function BulkUploadPage() {
   };
 
   const downloadTemplate = () => {
-    const template = `question,answer_a,answer_b,answer_c,answer_d,correct_answer,year,difficulty,topic
-"What is 2 + 2?","2","3","4","5","c",2023,"Easy","Arithmetic"
-"What is the capital of France?","London","Paris","Berlin","Madrid","b",2023,"Easy","Geography"`;
+    const template = `question,answer_a,answer_b,answer_c,answer_d,correct_answer,year,difficulty,topic,image_url
+"What is 2 + 2?","2","3","4","5","c",2023,"Easy","Arithmetic",""
+"What is the capital of France?","London","Paris","Berlin","Madrid","b",2023,"Easy","Geography","https://example.com/france-map.jpg"`;
     
     const blob = new Blob([template], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -484,6 +486,7 @@ export default function BulkUploadPage() {
                   <li>• <code className="bg-muted px-1 rounded">year</code> - Exam year</li>
                   <li>• <code className="bg-muted px-1 rounded">difficulty</code> - Easy, Medium, Hard</li>
                   <li>• <code className="bg-muted px-1 rounded">topic</code> - Question topic</li>
+                  <li>• <code className="bg-muted px-1 rounded">image_url</code> - URL to question image</li>
                 </ul>
               </div>
             </CardContent>

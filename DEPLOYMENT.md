@@ -31,9 +31,30 @@ Edit `.env` with secure values:
 ```env
 DB_PASSWORD=your-secure-database-password
 SESSION_SECRET=your-super-secret-session-key-change-in-production
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_PASSWORD=your-secure-admin-password
 ```
 
 **Important:** Use strong, unique passwords in production!
+
+## Authentication
+
+When running in Docker (self-hosted), the application uses **local username/password authentication** instead of Replit Auth.
+
+### Admin Account Setup
+
+On first startup, an admin user is automatically created using the credentials in your `.env` file:
+- Email: `ADMIN_EMAIL`
+- Password: `ADMIN_PASSWORD`
+
+**Both `ADMIN_EMAIL` and `ADMIN_PASSWORD` must be set in your `.env` file.** There are no default credentials for security reasons.
+
+### User Registration
+
+Users can register new accounts through the login page. The system supports:
+- Email/password authentication
+- Session-based login (7-day session duration)
+- Secure password hashing with bcrypt
 
 ### 3. Build and Start the Application
 

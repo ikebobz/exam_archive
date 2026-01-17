@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
+import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 import ExamsPage from "@/pages/exams/index";
 import ExamFormPage from "@/pages/exams/form";
@@ -77,7 +78,12 @@ function AppContent() {
   }
 
   if (!user) {
-    return <LandingPage />;
+    return (
+      <Switch>
+        <Route path="/login" component={LoginPage} />
+        <Route component={LandingPage} />
+      </Switch>
+    );
   }
 
   return <AuthenticatedLayout />;

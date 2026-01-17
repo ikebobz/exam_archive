@@ -13,6 +13,8 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://exampro:${DB_PASSWORD:-exampro123}@db:5432/exampro
       - SESSION_SECRET=${SESSION_SECRET:-your-super-secret-session-key-change-in-production}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:?ADMIN_EMAIL is required - set it in your .env file}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required - set it in your .env file}
     depends_on:
       db:
         condition: service_healthy

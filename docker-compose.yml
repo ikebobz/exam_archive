@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: exampro-cms
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://exampro:${DB_PASSWORD:-exampro123}@db:5432/exampro
+      - SESSION_SECRET=${SESSION_SECRET:-your-super-secret-session-key-change-in-production}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - exampro-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db:
+    image: postgres:16-alpine
+    container_name: exampro-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=exampro
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-exampro123}
+      - POSTGRES_DB=exampro
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - exampro-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exampro -d exampro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  exampro-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

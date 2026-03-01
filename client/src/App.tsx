@@ -77,16 +77,16 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return (
-      <Switch>
-        <Route path="/login" component={LoginPage} />
-        <Route component={LandingPage} />
-      </Switch>
-    );
+  if (user) {
+    return <AuthenticatedLayout />;
   }
 
-  return <AuthenticatedLayout />;
+  return (
+    <Switch>
+      <Route path="/login" component={LoginPage} />
+      <Route component={LandingPage} />
+    </Switch>
+  );
 }
 
 function App() {

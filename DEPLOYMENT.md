@@ -68,15 +68,9 @@ This will:
 - Start the ExamPro CMS application
 - Set up networking between services
 
-### 4. Initialize the Database
+### 4. Access the Application
 
-On first run, you need to push the database schema:
-
-```bash
-docker-compose exec app npm run db:push
-```
-
-### 5. Access the Application
+The application will automatically initialize the database schema on first startup.
 
 Open your browser and navigate to:
 - http://localhost:5000

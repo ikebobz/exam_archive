@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { getSession } from "./replit_integrations/auth";
 
 const app = express();
 const httpServer = createServer(app);
@@ -11,6 +12,12 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// Trust proxy for cookies in development
+app.set("trust proxy", 1);
+
+// Setup session middleware BEFORE other middleware
+app.use(getSession());
 
 app.use(
   express.json({

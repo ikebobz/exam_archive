@@ -20,17 +20,29 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Install postgresql-client for pg_isready health check
+RUN apk add --no-cache postgresql-client
+
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production
+# Install all dependencies (needed for drizzle-kit db:push)
+RUN npm ci
 
 # Copy built server from builder stage
 COPY --from=builder /app/dist/index.cjs ./dist/index.cjs
 
 # Copy built frontend assets from builder stage
 COPY --from=builder /app/dist/public ./dist/public
+
+# Copy drizzle config and schema for database migrations
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/shared ./shared
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -53,5 +65,5 @@ ENV PORT=5000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:5000/api/health || exit 1
 
-# Start the application
-CMD ["node", "dist/index.cjs"]
+# Start the application with entrypoint script
+ENTRYPOINT ["./docker-entrypoint.sh"]

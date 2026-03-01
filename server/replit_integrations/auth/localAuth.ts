@@ -12,21 +12,27 @@ const SALT_ROUNDS = 10;
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+  const isProduction = process.env.NODE_ENV === "production";
+  
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
+    createTableIfMissing: true,
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true,
+    proxy: true,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
       maxAge: sessionTtl,
     },
   });
@@ -62,8 +68,6 @@ async function validatePassword(user: User, password: string): Promise<boolean> 
 }
 
 export async function setupLocalAuth(app: Express) {
-  app.set("trust proxy", 1);
-  app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -117,7 +121,13 @@ export async function setupLocalAuth(app: Express) {
         if (err) {
           return res.status(500).json({ message: "Login failed" });
         }
-        return res.json({ success: true, user: { id: user.id, email: user.email } });
+        // Explicitly save the session after login
+        req.session.save((err) => {
+          if (err) {
+            return res.status(500).json({ message: "Login failed" });
+          }
+          return res.json({ success: true, user: { id: user.id, email: user.email } });
+        });
       });
     })(req, res, next);
   });
@@ -141,7 +151,13 @@ export async function setupLocalAuth(app: Express) {
         if (err) {
           return res.status(500).json({ message: "Registration failed" });
         }
-        return res.status(201).json({ success: true, user: { id: user.id, email: user.email } });
+        // Explicitly save the session after registration
+        req.session.save((err) => {
+          if (err) {
+            return res.status(500).json({ message: "Registration failed" });
+          }
+          return res.status(201).json({ success: true, user: { id: user.id, email: user.email } });
+        });
       });
     } catch (error) {
       console.error("Registration error:", error);

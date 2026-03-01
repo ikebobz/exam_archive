@@ -41,7 +41,7 @@ export default function LoginPage() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/");
+      window.location.href = "/";
     } catch (error) {
       toast({
         variant: "destructive",

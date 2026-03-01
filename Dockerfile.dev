@@ -1,0 +1,17 @@
+# Development stage with hot reload
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Expose port
+EXPOSE 5000
+
+# Run in development mode with file watching
+CMD ["npm", "run", "dev"]

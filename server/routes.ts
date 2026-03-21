@@ -5,6 +5,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { insertExamSchema, insertSubjectSchema, insertQuestionSchema } from "@shared/schema";
 import { z } from "zod";
+import * as XLSX from "xlsx";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -291,6 +292,103 @@ export async function registerRoutes(
       }
       console.error("Error bulk uploading questions:", error);
       res.status(500).json({ message: "Failed to bulk upload questions" });
+    }
+  });
+
+  // Excel file upload endpoint
+  app.post("/api/questions/upload-excel", isAuthenticated, async (req, res) => {
+    try {
+      const { subjectId, fileBuffer, fileName } = req.body;
+
+      if (!subjectId || !fileBuffer) {
+        return res.status(400).json({ message: "Missing subjectId or file" });
+      }
+
+      // Convert base64 string to buffer
+      const buffer = Buffer.from(fileBuffer, "base64");
+
+      // Parse Excel file
+      const workbook = XLSX.read(buffer, { type: "buffer" });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      
+      if (!worksheet) {
+        return res.status(400).json({ message: "No worksheet found in the Excel file" });
+      }
+
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (string | number | null)[][];
+      
+      if (rows.length === 0) {
+        return res.status(400).json({ message: "Excel file is empty" });
+      }
+
+      const questionsData = [];
+      const errors: string[] = [];
+
+      // Process each row
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNumber = i + 1;
+
+        // Validate row has at least 5 columns
+        if (!row || row.length < 5) {
+          errors.push(`Row ${rowNumber}: Must have 5 columns (question and 4 options)`);
+          continue;
+        }
+
+        const questionText = String(row[0] || "").trim();
+        const option1 = String(row[1] || "").trim();
+        const option2 = String(row[2] || "").trim();
+        const option3 = String(row[3] || "").trim();
+        const option4 = String(row[4] || "").trim();
+
+        // Validate question is not empty
+        if (!questionText) {
+          errors.push(`Row ${rowNumber}: Question text is required`);
+          continue;
+        }
+
+        // Validate all options are not empty
+        if (!option1 || !option2 || !option3 || !option4) {
+          errors.push(`Row ${rowNumber}: All four options are required`);
+          continue;
+        }
+
+        questionsData.push({
+          question: {
+            questionText,
+            imageUrl: null,
+            year: null,
+            difficulty: null,
+            topic: null,
+          },
+          answers: [
+            { answerText: option1, isCorrect: false, explanation: null },
+            { answerText: option2, isCorrect: false, explanation: null },
+            { answerText: option3, isCorrect: false, explanation: null },
+            { answerText: option4, isCorrect: false, explanation: null },
+          ],
+        });
+      }
+
+      if (questionsData.length === 0) {
+        return res.status(400).json({
+          success: false,
+          questionsUploaded: 0,
+          errors: errors.length > 0 ? errors : ["No valid questions found in the file"],
+        });
+      }
+
+      // Upload questions
+      const count = await storage.bulkCreateQuestions(parseInt(subjectId), questionsData);
+
+      res.json({
+        success: true,
+        questionsUploaded: count,
+        errors: errors.length > 0 ? errors : [],
+      });
+    } catch (error) {
+      console.error("Error uploading Excel file:", error);
+      res.status(500).json({ message: "Failed to process Excel file" });
     }
   });
 

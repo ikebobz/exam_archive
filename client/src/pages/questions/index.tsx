@@ -39,7 +39,8 @@ import {
   HelpCircle,
   MoreHorizontal,
   Eye,
-  ImageIcon
+  ImageIcon,
+  Upload
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,6 +57,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Question, Subject, Exam, Answer } from "@shared/schema";
+import ExcelUploader from "@/components/ExcelUploader";
 
 type QuestionWithRelations = Question & { 
   subject: Subject & { exam: Exam }; 
@@ -67,6 +69,8 @@ export default function QuestionsPage() {
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [deleteQuestion, setDeleteQuestion] = useState<QuestionWithRelations | null>(null);
   const [viewQuestion, setViewQuestion] = useState<QuestionWithRelations | null>(null);
+  const [showExcelUploader, setShowExcelUploader] = useState(false);
+  const [selectedSubjectForUpload, setSelectedSubjectForUpload] = useState<number | null>(null);
   const { toast } = useToast();
 
   const { data: questions, isLoading: isLoadingQuestions } = useQuery<QuestionWithRelations[]>({
@@ -130,12 +134,22 @@ export default function QuestionsPage() {
             Manage exam questions and answers
           </p>
         </div>
-        <Button asChild data-testid="button-add-question">
-          <Link href="/questions/new">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Question
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => setShowExcelUploader(true)}
+            data-testid="button-import-excel"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import Excel
+          </Button>
+          <Button asChild data-testid="button-add-question">
+            <Link href="/questions/new">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Question
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -398,6 +412,58 @@ export default function QuestionsPage() {
                 )}
               </div>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Excel Upload Dialog */}
+      <Dialog open={showExcelUploader} onOpenChange={setShowExcelUploader}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Questions from Excel</DialogTitle>
+          </DialogHeader>
+          
+          {!selectedSubjectForUpload ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                First, select which subject you want to import questions into:
+              </p>
+              <div className="space-y-2">
+                {subjects && subjects.length > 0 ? (
+                  <Select 
+                    value={selectedSubjectForUpload?.toString() || ""} 
+                    onValueChange={(value) => setSelectedSubjectForUpload(parseInt(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a subject..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map((subject) => (
+                        <SelectItem key={subject.id} value={subject.id.toString()}>
+                          {subject.name} ({subject.exam?.name})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No subjects available. Please create a subject first.
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <ExcelUploader
+              subjectId={selectedSubjectForUpload}
+              onSuccess={() => {
+                setShowExcelUploader(false);
+                setSelectedSubjectForUpload(null);
+              }}
+              onClose={() => {
+                setShowExcelUploader(false);
+                setSelectedSubjectForUpload(null);
+              }}
+            />
           )}
         </DialogContent>
       </Dialog>

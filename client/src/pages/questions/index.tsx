@@ -58,6 +58,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Question, Subject, Exam, Answer } from "@shared/schema";
 import ExcelUploader from "@/components/ExcelUploader";
+import JsonUploader from "@/components/JsonUploader";
 
 type QuestionWithRelations = Question & { 
   subject: Subject & { exam: Exam }; 
@@ -71,6 +72,8 @@ export default function QuestionsPage() {
   const [viewQuestion, setViewQuestion] = useState<QuestionWithRelations | null>(null);
   const [showExcelUploader, setShowExcelUploader] = useState(false);
   const [selectedSubjectForUpload, setSelectedSubjectForUpload] = useState<number | null>(null);
+  const [showJsonUploader, setShowJsonUploader] = useState(false);
+  const [selectedSubjectForJsonUpload, setSelectedSubjectForJsonUpload] = useState<number | null>(null);
   const { toast } = useToast();
 
   const { data: questions, isLoading: isLoadingQuestions } = useQuery<QuestionWithRelations[]>({
@@ -142,6 +145,14 @@ export default function QuestionsPage() {
           >
             <Upload className="h-4 w-4 mr-2" />
             Import Excel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowJsonUploader(true)}
+            data-testid="button-import-json"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import JSON
           </Button>
           <Button asChild data-testid="button-add-question">
             <Link href="/questions/new">
@@ -462,6 +473,58 @@ export default function QuestionsPage() {
               onClose={() => {
                 setShowExcelUploader(false);
                 setSelectedSubjectForUpload(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* JSON Upload Dialog */}
+      <Dialog open={showJsonUploader} onOpenChange={setShowJsonUploader}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Questions from JSON</DialogTitle>
+          </DialogHeader>
+
+          {!selectedSubjectForJsonUpload ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                First, select which subject you want to import questions into:
+              </p>
+              <div className="space-y-2">
+                {subjects && subjects.length > 0 ? (
+                  <Select
+                    value={selectedSubjectForJsonUpload?.toString() || ""}
+                    onValueChange={(value) => setSelectedSubjectForJsonUpload(parseInt(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a subject..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map((subject) => (
+                        <SelectItem key={subject.id} value={subject.id.toString()}>
+                          {subject.name} ({subject.exam?.name})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No subjects available. Please create a subject first.
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <JsonUploader
+              subjectId={selectedSubjectForJsonUpload}
+              onSuccess={() => {
+                setShowJsonUploader(false);
+                setSelectedSubjectForJsonUpload(null);
+              }}
+              onClose={() => {
+                setShowJsonUploader(false);
+                setSelectedSubjectForJsonUpload(null);
               }}
             />
           )}

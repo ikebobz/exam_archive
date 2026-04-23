@@ -5,7 +5,6 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { insertExamSchema, insertSubjectSchema, insertQuestionSchema } from "@shared/schema";
 import { z } from "zod";
-import * as XLSX from "xlsx";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -307,6 +306,9 @@ export async function registerRoutes(
       // Convert base64 string to buffer
       const buffer = Buffer.from(fileBuffer, "base64");
 
+      const xlsxModule = await import("xlsx");
+      const XLSX: any = (xlsxModule as any).read ? xlsxModule : (xlsxModule as any).default;
+
       // Parse Excel file
       const workbook = XLSX.read(buffer, { type: "buffer" });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -389,6 +391,118 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error uploading Excel file:", error);
       res.status(500).json({ message: "Failed to process Excel file" });
+    }
+  });
+
+  const jsonQuestionSchema = z.object({
+    topic: z.string().trim().optional(),
+    question_text: z.string().trim().min(1, "question_text is required"),
+    options: z.array(z.string().trim().min(1)).length(4, "options must contain exactly 4 items"),
+    correct_option: z.string().trim().regex(/^[A-Da-d]$/, "correct_option must be one of A, B, C, D"),
+    explanation: z.string().trim().optional(),
+    year: z.number().int().optional(),
+    difficulty: z.string().trim().optional(),
+    image_url: z.string().trim().optional(),
+  });
+
+  app.post("/api/questions/upload-json", isAuthenticated, async (req, res) => {
+    try {
+      const { subjectId, fileContent } = req.body as {
+        subjectId?: number | string;
+        fileContent?: string;
+      };
+
+      const parsedSubjectId = Number(subjectId);
+      if (!parsedSubjectId || Number.isNaN(parsedSubjectId)) {
+        return res.status(400).json({ message: "A valid subjectId is required" });
+      }
+
+      if (!fileContent || typeof fileContent !== "string") {
+        return res.status(400).json({ message: "JSON file content is required" });
+      }
+
+      let parsedPayload: unknown;
+      try {
+        parsedPayload = JSON.parse(fileContent);
+      } catch {
+        return res.status(400).json({ message: "Invalid JSON file" });
+      }
+
+      const payloadArray: unknown[] =
+        Array.isArray(parsedPayload)
+          ? parsedPayload
+          : parsedPayload &&
+              typeof parsedPayload === "object" &&
+              "questions" in parsedPayload &&
+              Array.isArray((parsedPayload as { questions?: unknown[] }).questions)
+            ? (parsedPayload as { questions: unknown[] }).questions
+            : [parsedPayload];
+
+      const errors: string[] = [];
+      const questionsData: {
+        question: {
+          questionText: string;
+          imageUrl?: string | null;
+          year?: number | null;
+          difficulty?: string | null;
+          topic?: string | null;
+        };
+        answers: { answerText: string; isCorrect: boolean; explanation?: string | null }[];
+      }[] = [];
+
+      payloadArray.forEach((rawItem, index) => {
+        const rowNumber = index + 1;
+        const validated = jsonQuestionSchema.safeParse(rawItem);
+
+        if (!validated.success) {
+          errors.push(`Item ${rowNumber}: ${validated.error.issues.map((i) => i.message).join(", ")}`);
+          return;
+        }
+
+        const item = validated.data;
+        const correctLetter = item.correct_option.toUpperCase();
+        const correctIndex = ["A", "B", "C", "D"].indexOf(correctLetter);
+
+        const normalizedOptions = item.options.map((option) => option.replace(/^[A-Da-d]\.\s*/, "").trim());
+        if (normalizedOptions.some((option) => option.length === 0)) {
+          errors.push(`Item ${rowNumber}: options contain empty value(s)`);
+          return;
+        }
+
+        questionsData.push({
+          question: {
+            questionText: item.question_text,
+            imageUrl: item.image_url ?? null,
+            year: item.year ?? null,
+            difficulty: item.difficulty ?? null,
+            topic: item.topic ?? null,
+          },
+          answers: normalizedOptions.map((option, optionIndex) => ({
+            answerText: option,
+            isCorrect: optionIndex === correctIndex,
+            explanation: optionIndex === correctIndex ? item.explanation ?? null : null,
+          })),
+        });
+      });
+
+      if (questionsData.length === 0) {
+        return res.status(400).json({
+          success: false,
+          questionsUploaded: 0,
+          errors: errors.length > 0 ? errors : ["No valid questions found in JSON file"],
+        });
+      }
+
+      const count = await storage.bulkCreateQuestions(parsedSubjectId, questionsData);
+
+      res.json({
+        success: true,
+        questionsUploaded: count,
+        errors,
+      });
+    } catch (error) {
+      console.error("Error uploading JSON file:", error);
+      res.status(500).json({ message: "Failed to process JSON file" });
     }
   });
 

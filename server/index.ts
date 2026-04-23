@@ -95,7 +95,8 @@ app.use((req, res, next) => {
   httpServer.listen(
     {
       port,
-      host: "0.0.0.0",
+      host: "::",
+      ipv6Only: false,
       reusePort: true,
     },
     () => {

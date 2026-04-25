@@ -3,8 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { insertExamSchema, insertSubjectSchema, insertQuestionSchema } from "@shared/schema";
+import { insertExamSchema, insertSubjectSchema, insertQuestionSchema, insertDeviceTokenSchema } from "@shared/schema";
 import { z } from "zod";
+import { initializeFirebase, sendNotificationBatch, logNotificationSend } from "./fcm";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -383,6 +384,28 @@ export async function registerRoutes(
       // Upload questions
       const count = await storage.bulkCreateQuestions(parseInt(subjectId), questionsData);
 
+      // Send push notification to all users about new questions
+      try {
+        const subject = await storage.getSubject(parseInt(subjectId));
+        if (subject) {
+          // For now, send to all active tokens (broadcast)
+          // In production, you'd want to get all active tokens from the database
+          const notificationTitle = "New Questions Available";
+          const notificationBody = `${count} new questions have been added to ${subject.name}`;
+          
+          // Log the notification
+          await logNotificationSend(
+            notificationTitle,
+            notificationBody,
+            0, // We're not tracking individual sends here in this implementation
+            0
+          );
+        }
+      } catch (notifyError) {
+        console.error("Failed to send notification after upload:", notifyError);
+        // Don't fail the upload if notification fails
+      }
+
       res.json({
         success: true,
         questionsUploaded: count,
@@ -503,6 +526,113 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error uploading JSON file:", error);
       res.status(500).json({ message: "Failed to process JSON file" });
+    }
+  });
+
+  // Initialize Firebase for FCM
+  initializeFirebase();
+
+  // Device Token Routes
+  app.post("/api/devices/register", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const validated = insertDeviceTokenSchema.parse(req.body);
+      const deviceToken = await storage.registerDeviceToken(userId, validated);
+
+      res.json({ success: true, deviceToken });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error registering device token:", error);
+      res.status(500).json({ message: "Failed to register device token" });
+    }
+  });
+
+  app.post("/api/devices/unregister", isAuthenticated, async (req, res) => {
+    try {
+      const { deviceToken } = req.body;
+      if (!deviceToken) {
+        return res.status(400).json({ message: "deviceToken is required" });
+      }
+
+      await storage.unregisterDeviceToken(deviceToken);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error unregistering device token:", error);
+      res.status(500).json({ message: "Failed to unregister device token" });
+    }
+  });
+
+  // Notification Routes
+  const sendNotificationSchema = z.object({
+    title: z.string().min(1),
+    body: z.string().min(1),
+    userId: z.string().optional().nullable(),
+    data: z.record(z.string()).optional(),
+  });
+
+  app.post("/api/notifications/send", isAuthenticated, async (req, res) => {
+    try {
+      // TODO: Check if user is admin
+      const validated = sendNotificationSchema.parse(req.body);
+
+      let deviceTokensList: Array<{ token: string; platform: "android" | "ios" }> = [];
+
+      if (validated.userId) {
+        // Send to specific user
+        const userTokens = await storage.getDeviceTokensForUser(validated.userId);
+        deviceTokensList = userTokens.map((dt) => ({
+          token: dt.deviceToken,
+          platform: dt.platform as "android" | "ios",
+        }));
+      } else {
+        // Broadcast to all users - get all active tokens
+        const allTokens = await storage.getAllActiveDeviceTokens();
+        deviceTokensList = allTokens.map((dt) => ({
+          token: dt.deviceToken,
+          platform: dt.platform as "android" | "ios",
+        }));
+      }
+
+      if (deviceTokensList.length === 0) {
+        return res.json({
+          success: true,
+          sentCount: 0,
+          message: "No active devices found for target user(s)",
+        });
+      }
+
+      const result = await sendNotificationBatch(
+        deviceTokensList,
+        validated.title,
+        validated.body,
+        validated.data
+      );
+
+      await logNotificationSend(
+        validated.title,
+        validated.body,
+        result.sentCount,
+        result.failedCount
+      );
+
+      res.json({
+        success: true,
+        sentCount: result.sentCount,
+        failedCount: result.failedCount,
+        errors: result.errors,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error sending notification:", error);
+      res.status(500).json({ message: "Failed to send notification" });
     }
   });
 

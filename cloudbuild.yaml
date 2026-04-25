@@ -14,7 +14,14 @@ steps:
     args: ['run', 'build']
     dir: '.'
 
-  # Step 4: Deploy to Cloud Run from source (builds container automatically)
+  # Step 4: Run database migrations
+  - name: 'gcr.io/cloud-builders/npm'
+    args: ['run', 'db:push']
+    dir: '.'
+    env:
+      - 'DATABASE_URL=${DATABASE_URL}'  # Pass DB URL via substitution
+
+  # Step 5: Deploy to Cloud Run from source (builds container automatically)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -27,19 +34,22 @@ steps:
       - '$_REGION'
       - '--platform'
       - 'managed'
-      # Add more as needed; use Secret Manager for secrets
+      - '--set-env-vars'
+      - 'FCM_SERVICE_KEY=$$FCM_SERVICE_KEY'
+    secretEnv: ['FCM_SERVICE_KEY']
 
 # Substitutions (define in trigger)
 substitutions:
   _SERVICE_NAME: exam-vault  # Your Cloud Run service name
   _REGION: europe-west3
-  _DB_USER: exampro-user
-  _DB_PASS: Vendetta@1983  # Use Secret Manager
-  _DB_HOST: your-cloud-sql-instance
-  _DB_NAME: exampro
-  _SESSION_SECRET: vendetta  # Use Secret Manager
-  _ADMIN_EMAIL: mcpikebobs@gmail.com
-  _ADMIN_PASSWORD: vendetta  # Use Secret Manager
+  _PROJECT_ID: project-6d216afb-169c-4b20-942  # Replace with your GCP project ID
+
+# Secret Manager configuration
+# Reference: https://cloud.google.com/build/docs/securing-builds/use-secrets
+secrets:
+  - versionName: projects/$_PROJECT_ID/secrets/fcm-service-key/versions/latest
+    env: 'FCM_SERVICE_KEY'
+         
 
 options:
   logging: CLOUD_LOGGING_ONLY

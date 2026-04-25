@@ -1,10 +1,11 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Re-export auth models
 export * from "./models/auth";
+import { users } from "./models/auth";
 
 // Exams table - stores the three national exams
 export const exams = pgTable("exams", {
@@ -78,6 +79,30 @@ export const answersRelations = relations(answers, ({ one }) => ({
   }),
 }));
 
+// Device Tokens table - stores FCM tokens from mobile apps for push notifications
+export const deviceTokens = pgTable(
+  "device_tokens",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    deviceToken: varchar("device_token", { length: 500 }).notNull(),
+    platform: varchar("platform", { length: 20 }).notNull(), // 'android' or 'ios'
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("idx_device_token_unique").on(table.deviceToken)],
+);
+
+export const deviceTokensRelations = relations(deviceTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [deviceTokens.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas - defined manually for better type safety with generatedAlwaysAsIdentity
 export const insertExamSchema = z.object({
   name: z.string().min(1).max(255),
@@ -108,6 +133,11 @@ export const insertAnswerSchema = z.object({
   explanation: z.string().nullable().optional(),
 });
 
+export const insertDeviceTokenSchema = z.object({
+  deviceToken: z.string().min(1).max(500),
+  platform: z.enum(["android", "ios"]),
+});
+
 // Types
 export type InsertExam = z.infer<typeof insertExamSchema>;
 export type Exam = typeof exams.$inferSelect;
@@ -120,6 +150,9 @@ export type Question = typeof questions.$inferSelect;
 
 export type InsertAnswer = z.infer<typeof insertAnswerSchema>;
 export type Answer = typeof answers.$inferSelect;
+
+export type InsertDeviceToken = z.infer<typeof insertDeviceTokenSchema>;
+export type DeviceToken = typeof deviceTokens.$inferSelect;
 
 // Extended types with relations
 export type QuestionWithAnswers = Question & { answers: Answer[] };

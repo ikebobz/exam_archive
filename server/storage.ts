@@ -1,12 +1,13 @@
 import { 
-  exams, subjects, questions, answers,
+  exams, subjects, questions, answers, deviceTokens,
   type Exam, type InsertExam,
   type Subject, type InsertSubject,
   type Question, type InsertQuestion,
-  type Answer, type InsertAnswer
+  type Answer, type InsertAnswer,
+  type DeviceToken, type InsertDeviceToken
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // Exams
@@ -47,6 +48,12 @@ export interface IStorage {
     recentExams: Exam[];
     recentQuestions: Question[];
   }>;
+
+  // Device Tokens
+  registerDeviceToken(userId: string, token: InsertDeviceToken): Promise<DeviceToken>;
+  unregisterDeviceToken(deviceToken: string): Promise<void>;
+  getDeviceTokensForUser(userId: string): Promise<DeviceToken[]>;
+  getAllActiveDeviceTokens(): Promise<DeviceToken[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -351,6 +358,63 @@ export class DatabaseStorage implements IStorage {
       recentExams,
       recentQuestions
     };
+  }
+
+  // Device Tokens
+  async registerDeviceToken(userId: string, token: InsertDeviceToken): Promise<DeviceToken> {
+    // Check if token already exists
+    const existing = await db
+      .select()
+      .from(deviceTokens)
+      .where(eq(deviceTokens.deviceToken, token.deviceToken));
+
+    if (existing.length > 0) {
+      // Update existing token
+      const [updated] = await db
+        .update(deviceTokens)
+        .set({
+          userId,
+          platform: token.platform,
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(deviceTokens.deviceToken, token.deviceToken))
+        .returning();
+      return updated;
+    }
+
+    // Create new token
+    const [created] = await db
+      .insert(deviceTokens)
+      .values({
+        userId,
+        deviceToken: token.deviceToken,
+        platform: token.platform,
+        isActive: true,
+      })
+      .returning();
+    return created;
+  }
+
+  async unregisterDeviceToken(deviceToken: string): Promise<void> {
+    await db
+      .update(deviceTokens)
+      .set({ isActive: false })
+      .where(eq(deviceTokens.deviceToken, deviceToken));
+  }
+
+  async getDeviceTokensForUser(userId: string): Promise<DeviceToken[]> {
+    return db
+      .select()
+      .from(deviceTokens)
+      .where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.isActive, true)));
+  }
+
+  async getAllActiveDeviceTokens(): Promise<DeviceToken[]> {
+    return db
+      .select()
+      .from(deviceTokens)
+      .where(eq(deviceTokens.isActive, true));
   }
 }
 

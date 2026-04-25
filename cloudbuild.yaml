@@ -19,7 +19,7 @@ steps:
     args: ['run', 'db:push']
     dir: '.'
     env:
-      - 'DATABASE_URL=${DATABASE_URL}'  # Pass DB URL via substitution
+      - 'DATABASE_URL=${_DATABASE_URL}'  # Pass DB URL via substitution
 
   # Step 5: Deploy to Cloud Run from source (builds container automatically)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -43,6 +43,7 @@ substitutions:
   _SERVICE_NAME: exam-vault  # Your Cloud Run service name
   _REGION: europe-west3
   _PROJECT_ID: project-6d216afb-169c-4b20-942  # Replace with your GCP project ID
+  _DATABASE_URL: 'postgresql://exampro-user:Vendetta%401983@/exampro-db?host=/cloudsql/project-6d216afb-169c-4b20-942:europe-west3:examvaultv1-sb'  # Replace <DB_HOST> with your DB connection string
 
 # Secret Manager configuration
 # Reference: https://cloud.google.com/build/docs/securing-builds/use-secrets

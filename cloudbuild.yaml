@@ -46,9 +46,11 @@ substitutions:
 
 # Secret Manager configuration
 # Reference: https://cloud.google.com/build/docs/securing-builds/use-secrets
-secrets:
+# Replace your existing 'secrets' block with this:
+availableSecrets:
+  secretManager:
   - versionName: projects/$_PROJECT_ID/secrets/fcm-service-key/versions/latest
-    secretEnv: 'FCM_SERVICE_KEY'
+    env: 'FCM_SERVICE_KEY'
          
 
 options:

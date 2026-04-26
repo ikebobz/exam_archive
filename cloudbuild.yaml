@@ -15,11 +15,11 @@ steps:
     dir: '.'
 
   # Step 4: Run database migrations
-  - name: 'gcr.io/cloud-builders/npm'
-    args: ['run', 'db:push']
-    dir: '.'
-    env:
-      - 'DATABASE_URL=${_DATABASE_URL}'  # Pass DB URL via substitution
+  # name: 'gcr.io/cloud-builders/npm'
+  # args: ['run', 'db:push']
+  # dir: '.'
+  # env:
+  #    - 'DATABASE_URL=${_DATABASE_URL}'  # Pass DB URL via substitution
 
   # Step 5: Deploy to Cloud Run from source (builds container automatically)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'

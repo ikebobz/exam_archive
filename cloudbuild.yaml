@@ -35,6 +35,8 @@ steps:
       - '--platform'
       - 'managed'
       - '--verbosity=debug'
+      - '--build-service-account'
+      - 'cloud-run-deployer@project-6d216afb-169c-4b20-942.iam.gserviceaccount.com'
       - '--set-env-vars'
       - 'FCM_SERVICE_KEY=$$FCM_SERVICE_KEY'
     secretEnv: ['FCM_SERVICE_KEY']

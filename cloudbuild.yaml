@@ -14,7 +14,7 @@ steps:
     args: ['run', 'build']
     dir: '.'
 
-  # Step 4: Run database migrations
+  # Step 4: Run database migrations--
   # name: 'gcr.io/cloud-builders/npm'
   # args: ['run', 'db:push']
   # dir: '.'

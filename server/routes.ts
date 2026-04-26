@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { insertExamSchema, insertSubjectSchema, insertQuestionSchema, insertDeviceTokenSchema } from "@shared/schema";
 import { z } from "zod";
@@ -568,6 +568,22 @@ export async function registerRoutes(
     }
   });
 
+  // Get device tokens for current user (for UI display)
+  app.get("/api/devices", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const deviceTokens = await storage.getDeviceTokensForUser(userId);
+      res.json(deviceTokens);
+    } catch (error) {
+      console.error("Error fetching device tokens:", error);
+      res.status(500).json({ message: "Failed to fetch device tokens" });
+    }
+  });
+
   // Notification Routes
   const sendNotificationSchema = z.object({
     title: z.string().min(1),
@@ -578,7 +594,18 @@ export async function registerRoutes(
 
   app.post("/api/notifications/send", isAuthenticated, async (req, res) => {
     try {
-      // TODO: Check if user is admin
+      // Check if user is admin
+      const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // Get user role from database
+      const user = await authStorage.getUser(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
       const validated = sendNotificationSchema.parse(req.body);
 
       let deviceTokensList: Array<{ token: string; platform: "android" | "ios" }> = [];

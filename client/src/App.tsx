@@ -18,6 +18,7 @@ import SubjectFormPage from "@/pages/subjects/form";
 import QuestionsPage from "@/pages/questions/index";
 import QuestionFormPage from "@/pages/questions/form";
 import BulkUploadPage from "@/pages/upload";
+import FCMPage from "@/pages/fcm";
 import { Loader2 } from "lucide-react";
 
 function AuthenticatedRouter() {
@@ -34,6 +35,7 @@ function AuthenticatedRouter() {
       <Route path="/questions/new" component={QuestionFormPage} />
       <Route path="/questions/:id/edit" component={QuestionFormPage} />
       <Route path="/upload" component={BulkUploadPage} />
+      <Route path="/fcm" component={FCMPage} />
       <Route component={NotFound} />
     </Switch>
   );

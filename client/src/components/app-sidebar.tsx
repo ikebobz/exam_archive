@@ -18,7 +18,8 @@ import {
   HelpCircle, 
   Upload, 
   LogOut,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Bell
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -49,6 +50,11 @@ const menuItems = [
     title: "Bulk Upload",
     url: "/upload",
     icon: Upload,
+  },
+  {
+    title: "FCM Management",
+    url: "/fcm",
+    icon: Bell,
   },
 ];
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Smartphone, Send, Users, Bell, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 
 interface DeviceToken {
@@ -37,8 +38,23 @@ interface DeviceResponse {
   deviceToken?: DeviceToken;
 }
 
+/** Normalize API rows (camelCase or legacy snake_case). */
+function normalizeDeviceToken(raw: Record<string, unknown>): DeviceToken {
+  return {
+    id: Number(raw.id),
+    userId: String(raw.userId ?? raw.user_id ?? ""),
+    deviceToken: String(raw.deviceToken ?? raw.device_token ?? ""),
+    platform: (raw.platform === "ios" ? "ios" : "android") as "android" | "ios",
+    isActive: Boolean(raw.isActive ?? raw.is_active ?? true),
+    createdAt: String(raw.createdAt ?? raw.created_at ?? ""),
+    updatedAt: String(raw.updatedAt ?? raw.updated_at ?? ""),
+  };
+}
+
 export default function FCMManagement() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [deviceToken, setDeviceToken] = useState("");
   const [platform, setPlatform] = useState<"android" | "ios">("android");
   const [notificationTitle, setNotificationTitle] = useState("");
@@ -47,12 +63,21 @@ export default function FCMManagement() {
   const [isBroadcast, setIsBroadcast] = useState(false);
 
   // Fetch device tokens
-  const { data: deviceTokens, isLoading: tokensLoading } = useQuery({
+  const {
+    data: deviceTokens,
+    isLoading: tokensLoading,
+    isError: tokensError,
+    error: tokensFetchError,
+    refetch: refetchDevices,
+  } = useQuery({
     queryKey: ["device-tokens"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/devices");
-      return response.json() as Promise<DeviceToken[]>;
+      const rows = (await response.json()) as Record<string, unknown>[];
+      return rows.map(normalizeDeviceToken);
     },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   // Register device token mutation
@@ -247,10 +272,29 @@ export default function FCMManagement() {
                 <Users className="h-5 w-5" />
                 Registered Devices ({activeTokens.length} active, {inactiveTokens.length} inactive)
               </CardTitle>
+              {(isAdmin ||
+                (deviceTokens && new Set(deviceTokens.map((t) => t.userId)).size > 1)) && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Showing all devices in the database (including mobile app registrations).
+                </p>
+              )}
             </CardHeader>
             <CardContent>
               {tokensLoading ? (
                 <div className="text-center py-4">Loading devices...</div>
+              ) : tokensError ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="flex flex-col gap-2">
+                    <span>
+                      Failed to load devices:{" "}
+                      {tokensFetchError instanceof Error ? tokensFetchError.message : "Unknown error"}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => refetchDevices()}>
+                      Retry
+                    </Button>
+                  </AlertDescription>
+                </Alert>
               ) : deviceTokens && deviceTokens.length > 0 ? (
                 <div className="space-y-4">
                   {activeTokens.length > 0 && (
@@ -263,8 +307,13 @@ export default function FCMManagement() {
                         {activeTokens.map((token) => (
                           <div key={token.id} className="flex items-center justify-between p-3 border rounded-lg">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <Badge variant="secondary">{token.platform}</Badge>
+                                {isAdmin && token.userId && (
+                                  <span className="text-xs text-muted-foreground font-mono">
+                                    user {token.userId.slice(0, 8)}…
+                                  </span>
+                                )}
                                 <span className="font-mono text-sm text-gray-600 truncate">
                                   {token.deviceToken}
                                 </span>

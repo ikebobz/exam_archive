@@ -48,7 +48,13 @@ async function getUserById(id: string): Promise<User | undefined> {
   return user;
 }
 
-async function createUser(email: string, password: string, firstName?: string, lastName?: string): Promise<User> {
+async function createUser(
+  email: string,
+  password: string,
+  firstName?: string,
+  lastName?: string,
+  role: "user" | "admin" = "user",
+): Promise<User> {
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
   const [user] = await db
     .insert(users)
@@ -57,6 +63,7 @@ async function createUser(email: string, password: string, firstName?: string, l
       passwordHash,
       firstName: firstName || null,
       lastName: lastName || null,
+      role,
     })
     .returning();
   return user;
@@ -196,7 +203,10 @@ export async function seedAdminUser() {
   const existingUser = await getUserByEmail(adminEmail);
   if (!existingUser) {
     console.log(`Creating admin user: ${adminEmail}`);
-    await createUser(adminEmail, adminPassword, "Admin", "User");
+    await createUser(adminEmail, adminPassword, "Admin", "User", "admin");
     console.log("Admin user created successfully");
+  } else if (existingUser.role !== "admin") {
+    await db.update(users).set({ role: "admin", updatedAt: new Date() }).where(eq(users.email, adminEmail));
+    console.log(`Promoted existing user to admin: ${adminEmail}`);
   }
 }

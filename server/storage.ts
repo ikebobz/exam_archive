@@ -53,6 +53,7 @@ export interface IStorage {
   registerDeviceToken(userId: string, token: InsertDeviceToken): Promise<DeviceToken>;
   unregisterDeviceToken(deviceToken: string): Promise<void>;
   getDeviceTokensForUser(userId: string): Promise<DeviceToken[]>;
+  getAllDeviceTokens(): Promise<DeviceToken[]>;
   getAllActiveDeviceTokens(): Promise<DeviceToken[]>;
 }
 
@@ -407,7 +408,15 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(deviceTokens)
-      .where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.isActive, true)));
+      .where(eq(deviceTokens.userId, userId))
+      .orderBy(desc(deviceTokens.createdAt));
+  }
+
+  async getAllDeviceTokens(): Promise<DeviceToken[]> {
+    return db
+      .select()
+      .from(deviceTokens)
+      .orderBy(desc(deviceTokens.createdAt));
   }
 
   async getAllActiveDeviceTokens(): Promise<DeviceToken[]> {

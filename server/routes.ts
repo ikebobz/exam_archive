@@ -1,11 +1,20 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
+import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage, getRequestUserId } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { insertExamSchema, insertSubjectSchema, insertQuestionSchema, insertDeviceTokenSchema } from "@shared/schema";
+import type { User } from "@shared/models/auth";
 import { z } from "zod";
 import { initializeFirebase, sendNotificationBatch, logNotificationSend } from "./fcm";
+
+/** CMS operators (admin role or ADMIN_EMAIL) see every device token on the FCM panel. */
+function canViewAllDeviceTokens(user: User | undefined): boolean {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  return !!adminEmail && user.email?.trim().toLowerCase() === adminEmail;
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -535,7 +544,7 @@ export async function registerRoutes(
   // Device Token Routes
   app.post("/api/devices/register", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = getRequestUserId(req);
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -568,15 +577,18 @@ export async function registerRoutes(
     }
   });
 
-  // Get device tokens for current user (for UI display)
+  // FCM panel: admins see all tokens; other users see only their own
   app.get("/api/devices", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
+      const userId = getRequestUserId(req);
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
-      const deviceTokens = await storage.getDeviceTokensForUser(userId);
+      const user = await authStorage.getUser(userId);
+      const deviceTokens = canViewAllDeviceTokens(user)
+        ? await storage.getAllDeviceTokens()
+        : await storage.getDeviceTokensForUser(userId);
       res.json(deviceTokens);
     } catch (error) {
       console.error("Error fetching device tokens:", error);
@@ -594,15 +606,13 @@ export async function registerRoutes(
 
   app.post("/api/notifications/send", isAuthenticated, async (req, res) => {
     try {
-      // Check if user is admin
-      const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
+      const userId = getRequestUserId(req);
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
-      // Get user role from database
       const user = await authStorage.getUser(userId);
-      if (!user || user.role !== 'admin') {
+      if (!canViewAllDeviceTokens(user)) {
         return res.status(403).json({ message: "Admin access required" });
       }
 

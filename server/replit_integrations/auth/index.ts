@@ -26,6 +26,12 @@ export const isAuthenticated: RequestHandler = (req, res, next) => {
   }
 };
 
+/** Session user id — works for local auth (`id`) and Replit OIDC (`claims.sub`). */
+export function getRequestUserId(req: { user?: Express.User }): string | undefined {
+  const user = req.user as { id?: string; claims?: { sub?: string } } | undefined;
+  return user?.claims?.sub ?? user?.id;
+}
+
 export function getSession() {
   if (isReplitEnvironment) {
     return getReplitSession();

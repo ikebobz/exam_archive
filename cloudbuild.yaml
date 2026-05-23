@@ -37,9 +37,9 @@ steps:
       - '--verbosity=debug'
       - '--build-service-account'
       - 'projects/project-6d216afb-169c-4b20-942/serviceAccounts/cloud-run-deployer@project-6d216afb-169c-4b20-942.iam.gserviceaccount.com'
-      - '--set-env-vars'
-      - 'FCM_SERVICE_KEY=$$FCM_SERVICE_KEY'
-    secretEnv: ['FCM_SERVICE_KEY']
+      # Mount Secret Manager secret as env var on Cloud Run (not plain env-vars)
+      - '--set-secrets'
+      - 'FCM_SERVICE_KEY=fcm-service-key:latest'
 
 # Substitutions (define in trigger)
 substitutions:
@@ -48,14 +48,6 @@ substitutions:
   _PROJECT_ID: project-6d216afb-169c-4b20-942  # Replace with your GCP project ID
   _DATABASE_URL: 'postgresql://exampro-user:Vendetta%401983@/exampro-db?host=/cloudsql/project-6d216afb-169c-4b20-942:europe-west3:examvaultv1-sb'  # Replace <DB_HOST> with your DB connection string
 
-# Secret Manager configuration
-# Reference: https://cloud.google.com/build/docs/securing-builds/use-secrets
-# Replace your existing 'secrets' block with this:
-availableSecrets:
-  secretManager:
-  - versionName: projects/$_PROJECT_ID/secrets/fcm-service-key/versions/latest
-    env: 'FCM_SERVICE_KEY'
-         
 
 options:
   logging: CLOUD_LOGGING_ONLY
